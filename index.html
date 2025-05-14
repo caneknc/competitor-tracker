@@ -60,6 +60,9 @@
                         <option value="" selected disabled>Seleccione un promotor</option>
                         <!-- Promoters will be added here dynamically -->
                     </select>
+                    <div class="invalid-feedback">
+                        Por favor seleccione un promotor
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <label for="storeName" class="form-label">Nombre de la Tienda</label>
@@ -67,20 +70,29 @@
                         <option value="" selected disabled>Seleccione una tienda</option>
                         <!-- Stores will be added here dynamically -->
                     </select>
+                    <div class="invalid-feedback">
+                        Por favor seleccione una tienda
+                    </div>
                 </div>
             </div>
 
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label for="saleDate" class="form-label">Fecha</label>
-                    <input type="date" class="form-control" id="saleDate">
+                    <input type="date" class="form-control" id="saleDate" required>
+                    <div class="invalid-feedback">
+                        Por favor ingrese una fecha válida
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <label for="ourModel" class="form-label">Nuestro Modelo</label>
-                    <select class="form-select" id="ourModel">
-                        <option value="" selected>Seleccione un modelo</option>
-                        <!-- Models will be added here -->
+                    <select class="form-select" id="ourModel" required>
+                        <option value="" selected disabled>Seleccione un modelo</option>
+                        <!-- Models will be added here dynamically -->
                     </select>
+                    <div class="invalid-feedback">
+                        Por favor seleccione un modelo
+                    </div>
                 </div>
             </div>
 
@@ -89,11 +101,14 @@
             </div>
 
             <div class="d-grid gap-2 col-md-6 mx-auto mt-4">
-                <button type="submit" class="btn btn-primary btn-lg">Enviar Datos</button>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    Enviar Datos
+                </button>
             </div>
         </form>
 
-        <div id="successMessage" class="alert alert-success" role="alert">
+        <div id="successMessage" class="alert alert-success mt-3" role="alert" style="display: none;">
             ¡Datos enviados correctamente!
         </div>
     </div>
