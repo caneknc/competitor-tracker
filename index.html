@@ -507,7 +507,17 @@
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalButtonText;
                 delete window[callbackName];
+                
+                // Remove script element if it's still in the DOM
+                if (document.body.contains(script)) {
+                    document.body.removeChild(script);
+                }
             };
+            
+            // Add script to the page to make the request
+            console.log('13. Appending form submission script to body');
+            document.body.appendChild(script);
+            console.log('14. Form submission script appended, request should be in progress');
             
             // Set a timeout to clean up if the request takes too long
             const timeout = setTimeout(() => {
