@@ -1,0 +1,3 @@
+@echo off
+echo Starting local server at http://localhost:8000
+powershell -NoProfile -Command "$listener = New-Object System.Net.HttpListener; $listener.Prefixes.Add('http://localhost:8000/'); $listener.Start(); while ($true) { $context = $listener.GetContext(); $url = $context.Request.Url.LocalPath; if ($url -eq '/') { $url = '/index.html' }; $filePath = "." + $url; if (Test-Path $filePath) { $content = [System.IO.File]::ReadAllText($filePath); $buffer = [System.Text.Encoding]::UTF8.GetBytes($content); $context.Response.ContentLength64 = $buffer.Length; $context.Response.OutputStream.Write($buffer, 0, $buffer.Length); } else { $context.Response.StatusCode = 404; }; $context.Response.Close() }"
