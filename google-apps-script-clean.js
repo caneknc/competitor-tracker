@@ -251,12 +251,13 @@ function getInitialData(e) {
 }
 
 // Handle both GET and POST requests
+// Handle both GET and POST requests
 function handleRequest(e) {
   var params = e.parameter;
   var callback = params.callback;
   var isJsonp = !!callback;
   var action = params.action;
-  
+
   try {
     // Log the request for debugging
     console.log('Handling request:', {
@@ -265,157 +266,48 @@ function handleRequest(e) {
       contentType: e.contentType,
       postData: e.postData ? e.postData.getDataAsString() : null
     });
-    
+
     // Handle different actions
     if (action === 'getData') {
       return getInitialData(e);
     } else if (action === 'submitData') {
-      // Handle form submission
-      var jsonData;
-      
-      try {
-        // Try to get data from POST body first
-        if (e.postData && e.postData.contents) {
-          jsonData = JSON.parse(e.postData.contents);
-        } 
-        // Fall back to URL parameters
-        else if (params.data) {
-          jsonData = JSON.parse(params.data);
-        } else {
-          throw new Error('No data received in the request');
-        }
-      } catch (error) {
-        console.error('Error parsing request data:', error);
-        var errorResponse = {
-          status: 'error',
-          message: 'Invalid request data format',
-          details: error.message
-        };
-        return isJsonp 
-          ? createJsonpResponse(errorResponse, callback)
-          : createResponse(errorResponse, 400);
-      }
-      
-      // Validate required fields
-      var missingFields = [];
-      if (!jsonData.promoterName) missingFields.push('promoterName');
-      if (!jsonData.storeName) missingFields.push('storeName');
-      if (!jsonData.saleDate) missingFields.push('saleDate');
-      if (!jsonData.ourModel) missingFields.push('ourModel');
-      if (!jsonData.competitors || !Array.isArray(jsonData.competitors)) {
-        missingFields.push('competitors');
-      }
-      
-      if (missingFields.length > 0) {
-        var validationError = {
-          status: 'error',
-          message: 'Missing required fields',
-          missingFields: missingFields
-        };
-        return isJsonp 
-          ? createJsonpResponse(validationError, callback)
-          : createResponse(validationError, 400);
-      }
-      
-      try {
-        // Get the spreadsheet
-        var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-        if (!ss) {
-          throw new Error('Could not open spreadsheet with ID: ' + SPREADSHEET_ID);
-        }
-        
-        // Get or create the sheet
-        var sheet = ss.getSheetByName(SHEETS.SALES);
-        if (!sheet) {
-          console.log('Creating new sheet:', SHEETS.SALES);
-          sheet = ss.insertSheet(SHEETS.SALES);
-          // Set headers
-          sheet.appendRow([
-            'Timestamp', 
-            'Promoter Name', 
-            'Store Name', 
-            'Date',
-            'Our Model',
-            'Competitor Name',
-            'Sales',
-            'Stock'
-          ]);
-        }
-        
-        // Add the data to the sheet
-        var timestamp = new Date();
-        var rows = [];
-        
-        // Prepare all rows to be added in a batch
-        jsonData.competitors.forEach(function(competitor) {
-          rows.push([
-            timestamp,
-            jsonData.promoterName,
-            jsonData.storeName,
-            jsonData.saleDate,
-            jsonData.ourModel,
-            competitor.name || '',
-            competitor.sales || '',
-            competitor.stock || ''
-          ]);
-        });
-        
-        // Add all rows in a single operation for better performance
-        if (rows.length > 0) {
-          sheet.getRange(
-            sheet.getLastRow() + 1, 
-            1, 
-            rows.length, 
-            rows[0].length
-          ).setValues(rows);
-        }
-        
-        // Prepare success response
-        var successResponse = {
-          status: 'success',
-          message: 'Data saved successfully',
-          recordsAdded: rows.length
-        };
-        
-        return isJsonp 
-          ? createJsonpResponse(successResponse, callback)
-          : createResponse(successResponse);
-          
-      } catch (error) {
-        console.error('Error saving data:', error);
-        var saveErrorResponse = {
-          status: 'error',
-          message: 'Failed to save data',
-          details: error.message
-        };
-        return isJsonp 
-          ? createJsonpResponse(saveErrorResponse, callback)
-          : createResponse(saveErrorResponse, 500);
-      }
-    } else {
-      // Handle unknown action
-      var actionError = {
-        status: 'error',
-        message: 'Invalid action',
-        details: 'The action \'' + action + '\' is not supported'
+      // ... (rest of your submitData handling code) ...
+
+      // Prepare success response
+      var successResponse = {
+        status: 'success',
+        message: 'Data saved successfully',
+        recordsAdded: rows.length
       };
-      
-      return isJsonp 
-        ? createJsonpResponse(actionError, callback)
-        : createResponse(actionError, 400);
+
+      if (isJsonp) {
+        return createJsonpResponse(successResponse, callback);
+      } else {
+        return createResponse(successResponse);
+      }
+
+      // ... (rest of your submitData error handling) ...
+
+    } else {
+      // ... (rest of your unknown action handling) ...
     }
   } catch (error) {
-    console.error('Error in handleRequest:', error);
-    var errorResponse = {
-      status: 'error',
-      message: 'An unexpected error occurred',
-      details: error.message || error.toString()
-    };
-    
-    return isJsonp 
-      ? createJsonpResponse(errorResponse, callback)
-      : createResponse(errorResponse, 500);
+    // ... (rest of your general error handling) ...
   }
+}
+
+// Create a JSONP response
+function createJsonpResponse(data, callback) {
+  const response = ContentService.createTextOutput(callback + '(' + JSON.stringify(data) + ')');
+  response.setMimeType(ContentService.MimeType.JAVASCRIPT); // Ensure correct MIME type
+  
+  // Set CORS headers
+  const headers = setCorsHeaders();
+  Object.keys(headers).forEach(function(key) {
+    response.setHeader(key, headers[key]);
+  });
+  
+  return response;
 }
 
 // Test function to verify script setup
