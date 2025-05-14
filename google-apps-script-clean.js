@@ -30,7 +30,7 @@ function doOptions() {
   const response = HtmlService.createHtmlOutput('');
   const headers = setCorsHeaders();
   
-  Object.keys(headers).forEach(key => {
+  Object.keys(headers).forEach(function(key) {
     response.setHeader(key, headers[key]);
   });
   
@@ -70,7 +70,7 @@ function doGet(e) {
     
     // Add CORS headers
     const headers = setCorsHeaders();
-    Object.keys(headers).forEach(key => {
+    Object.keys(headers).forEach(function(key) {
       html.setHeader(key, headers[key]);
     });
     
@@ -91,7 +91,40 @@ function handleError(error) {
   
   response.setMimeType(ContentService.MimeType.JSON);
   const headers = setCorsHeaders();
-  Object.keys(headers).forEach(key => {
+  Object.keys(headers).forEach(function(key) {
+    response.setHeader(key, headers[key]);
+  });
+  
+  return response;
+}
+
+// Create a proper response with CORS headers
+function createResponse(data, statusCode) {
+  statusCode = statusCode || 200;
+  const response = ContentService.createTextOutput(JSON.stringify(data));
+  response.setMimeType(ContentService.MimeType.JSON);
+  
+  // Set CORS headers
+  const headers = setCorsHeaders();
+  Object.keys(headers).forEach(function(key) {
+    response.setHeader(key, headers[key]);
+  });
+  
+  if (statusCode !== 200) {
+    response.setStatusCode(statusCode);
+  }
+  
+  return response;
+}
+
+// Create a JSONP response
+function createJsonpResponse(data, callback) {
+  const response = ContentService.createTextOutput(callback + '(' + JSON.stringify(data) + ')');
+  response.setMimeType(ContentService.MimeType.JAVASCRIPT);
+  
+  // Set CORS headers
+  const headers = setCorsHeaders();
+  Object.keys(headers).forEach(function(key) {
     response.setHeader(key, headers[key]);
   });
   
@@ -116,32 +149,34 @@ function getInitialData(e) {
     const promotersSheet = ss.getSheetByName(SHEETS.PROMOTERS);
     const promotersData = promotersSheet ? promotersSheet.getDataRange().getValues() : [];
     const promoters = [];
-    const promoterMap = new Map(); // To group stores by promoter
+    const promoterMap = {}; // To group stores by promoter
     
     // Skip header row
-    for (let i = 1; i < promotersData.length; i++) {
-      const row = promotersData[i];
+    for (var i = 1; i < promotersData.length; i++) {
+      var row = promotersData[i];
       if (row && row[PROMOTER_COL]) {
-        const promoterName = row[PROMOTER_COL].toString().trim();
-        const storeName = row[STORE_COL] ? row[STORE_COL].toString().trim() : '';
+        var promoterName = row[PROMOTER_COL].toString().trim();
+        var storeName = row[STORE_COL] ? row[STORE_COL].toString().trim() : '';
         
-        if (!promoterMap.has(promoterName)) {
-          promoterMap.set(promoterName, []);
+        if (!promoterMap[promoterName]) {
+          promoterMap[promoterName] = [];
         }
         
         if (storeName) {
-          promoterMap.get(promoterName).push(storeName);
+          promoterMap[promoterName].push(storeName);
         }
       }
     }
     
     // Convert map to array of promoter objects
-    promoterMap.forEach((stores, name) => {
-      promoters.push({
-        name: name,
-        stores: stores
-      });
-    });
+    for (var name in promoterMap) {
+      if (promoterMap.hasOwnProperty(name)) {
+        promoters.push({
+          name: name,
+          stores: promoterMap[name]
+        });
+      }
+    }
     
     // Get stores
     console.log('Fetching stores...');
@@ -150,12 +185,12 @@ function getInitialData(e) {
     const stores = [];
     
     // Skip header row and add unique stores
-    const storeSet = new Set();
-    for (let i = 1; i < storesData.length; i++) {
-      if (storesData[i] && storesData[i][0]) {
-        const storeName = storesData[i][0].toString().trim();
-        if (storeName && !storeSet.has(storeName)) {
-          storeSet.add(storeName);
+    const storeSet = {};
+    for (var j = 1; j < storesData.length; j++) {
+      if (storesData[j] && storesData[j][0]) {
+        var storeName = storesData[j][0].toString().trim();
+        if (storeName && !storeSet[storeName]) {
+          storeSet[storeName] = true;
           stores.push(storeName);
         }
       }
@@ -168,10 +203,10 @@ function getInitialData(e) {
     const modelCompetitors = {};
     
     // Skip header row
-    for (let i = 1; i < modelsData.length; i++) {
-      if (modelsData[i]) {
-        const model = modelsData[i][MODEL_COL] ? modelsData[i][MODEL_COL].toString().trim() : '';
-        const competitor = modelsData[i][COMPETITOR_COL] ? modelsData[i][COMPETITOR_COL].toString().trim() : '';
+    for (var k = 1; k < modelsData.length; k++) {
+      if (modelsData[k]) {
+        var model = modelsData[k][MODEL_COL] ? modelsData[k][MODEL_COL].toString().trim() : '';
+        var competitor = modelsData[k][COMPETITOR_COL] ? modelsData[k][COMPETITOR_COL].toString().trim() : '';
         
         if (model) {
           if (!modelCompetitors[model]) {
@@ -215,44 +250,12 @@ function getInitialData(e) {
   }
 }
 
-// Create a proper response with CORS headers
-function createResponse(data, statusCode = 200) {
-  const response = ContentService.createTextOutput(JSON.stringify(data));
-  response.setMimeType(ContentService.MimeType.JSON);
-  
-  // Set CORS headers
-  const headers = setCorsHeaders();
-  Object.keys(headers).forEach(key => {
-    response.setHeader(key, headers[key]);
-  });
-  
-  if (statusCode !== 200) {
-    response.setStatusCode(statusCode);
-  }
-  
-  return response;
-}
-
-// Create a JSONP response
-function createJsonpResponse(data, callback) {
-  const response = ContentService.createTextOutput(`${callback}(${JSON.stringify(data)})`);
-  response.setMimeType(ContentService.MimeType.JAVASCRIPT);
-  
-  // Set CORS headers
-  const headers = setCorsHeaders();
-  Object.keys(headers).forEach(key => {
-    response.setHeader(key, headers[key]);
-  });
-  
-  return response;
-}
-
 // Handle both GET and POST requests
 function handleRequest(e) {
-  const params = e.parameter;
-  const callback = params.callback;
-  const isJsonp = !!callback;
-  const action = params.action;
+  var params = e.parameter;
+  var callback = params.callback;
+  var isJsonp = !!callback;
+  var action = params.action;
   
   try {
     // Log the request for debugging
@@ -262,16 +265,13 @@ function handleRequest(e) {
       contentType: e.contentType,
       postData: e.postData ? e.postData.getDataAsString() : null
     });
-    // Log the incoming request for debugging
-    console.log('Action:', action);
-    console.log('Parameters:', JSON.stringify(params));
     
     // Handle different actions
     if (action === 'getData') {
       return getInitialData(e);
     } else if (action === 'submitData') {
       // Handle form submission
-      let jsonData;
+      var jsonData;
       
       try {
         // Try to get data from POST body first
@@ -286,7 +286,7 @@ function handleRequest(e) {
         }
       } catch (error) {
         console.error('Error parsing request data:', error);
-        const errorResponse = {
+        var errorResponse = {
           status: 'error',
           message: 'Invalid request data format',
           details: error.message
@@ -297,33 +297,35 @@ function handleRequest(e) {
       }
       
       // Validate required fields
-      const missingFields = [];
+      var missingFields = [];
       if (!jsonData.promoterName) missingFields.push('promoterName');
       if (!jsonData.storeName) missingFields.push('storeName');
       if (!jsonData.saleDate) missingFields.push('saleDate');
       if (!jsonData.ourModel) missingFields.push('ourModel');
-      if (!jsonData.competitors || !Array.isArray(jsonData.competitors)) missingFields.push('competitors');
+      if (!jsonData.competitors || !Array.isArray(jsonData.competitors)) {
+        missingFields.push('competitors');
+      }
       
       if (missingFields.length > 0) {
-        const errorResponse = {
+        var validationError = {
           status: 'error',
           message: 'Missing required fields',
           missingFields: missingFields
         };
         return isJsonp 
-          ? createJsonpResponse(errorResponse, callback)
-          : createResponse(errorResponse, 400);
+          ? createJsonpResponse(validationError, callback)
+          : createResponse(validationError, 400);
       }
       
       try {
         // Get the spreadsheet
-        const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+        var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
         if (!ss) {
           throw new Error('Could not open spreadsheet with ID: ' + SPREADSHEET_ID);
         }
         
         // Get or create the sheet
-        let sheet = ss.getSheetByName(SHEETS.SALES);
+        var sheet = ss.getSheetByName(SHEETS.SALES);
         if (!sheet) {
           console.log('Creating new sheet:', SHEETS.SALES);
           sheet = ss.insertSheet(SHEETS.SALES);
@@ -341,11 +343,11 @@ function handleRequest(e) {
         }
         
         // Add the data to the sheet
-        const timestamp = new Date();
-        const rows = [];
+        var timestamp = new Date();
+        var rows = [];
         
         // Prepare all rows to be added in a batch
-        jsonData.competitors.forEach(competitor => {
+        jsonData.competitors.forEach(function(competitor) {
           rows.push([
             timestamp,
             jsonData.promoterName,
@@ -369,42 +371,42 @@ function handleRequest(e) {
         }
         
         // Prepare success response
-        const response = {
+        var successResponse = {
           status: 'success',
           message: 'Data saved successfully',
           recordsAdded: rows.length
         };
         
         return isJsonp 
-          ? createJsonpResponse(response, callback)
-          : createResponse(response);
+          ? createJsonpResponse(successResponse, callback)
+          : createResponse(successResponse);
           
       } catch (error) {
         console.error('Error saving data:', error);
-        const errorResponse = {
+        var saveErrorResponse = {
           status: 'error',
           message: 'Failed to save data',
           details: error.message
         };
         return isJsonp 
-          ? createJsonpResponse(errorResponse, callback)
-          : createResponse(errorResponse, 500);
+          ? createJsonpResponse(saveErrorResponse, callback)
+          : createResponse(saveErrorResponse, 500);
       }
     } else {
       // Handle unknown action
-      const errorResponse = {
+      var actionError = {
         status: 'error',
         message: 'Invalid action',
-        details: `The action '${action}' is not supported`
+        details: 'The action \'' + action + '\' is not supported'
       };
       
       return isJsonp 
-        ? createJsonpResponse(errorResponse, callback)
-        : createResponse(errorResponse, 400);
+        ? createJsonpResponse(actionError, callback)
+        : createResponse(actionError, 400);
     }
   } catch (error) {
     console.error('Error in handleRequest:', error);
-    const errorResponse = {
+    var errorResponse = {
       status: 'error',
       message: 'An unexpected error occurred',
       details: error.message || error.toString()
@@ -419,31 +421,45 @@ function handleRequest(e) {
 // Test function to verify script setup
 function testSetup() {
   try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     if (!ss) {
-      return { success: false, message: 'Could not access spreadsheet' };
+      throw new Error('Could not open spreadsheet with ID: ' + SPREADSHEET_ID);
     }
     
-    let sheet = ss.getSheetByName(SHEET_NAME);
-    if (!sheet) {
-      sheet = ss.insertSheet(SHEET_NAME);
-      sheet.appendRow(['Timestamp', 'Promoter Name', 'Store Name', 'Date', 'Our Model', 'Competitor Model', 'Sales', 'Stock']);
-      return { success: true, message: 'Created new sheet: ' + SHEET_NAME, sheetUrl: ss.getUrl() };
+    // Check if all required sheets exist
+    var sheets = ss.getSheets();
+    var sheetNames = sheets.map(function(sheet) {
+      return sheet.getName();
+    });
+    
+    var missingSheets = [];
+    for (var sheetName in SHEETS) {
+      if (sheetNames.indexOf(SHEETS[sheetName]) === -1) {
+        missingSheets.push(SHEETS[sheetName]);
+      }
     }
     
-    return { 
-      success: true, 
-      message: 'Sheet already exists', 
-      sheetName: sheet.getName(),
-      sheetUrl: ss.getUrl(),
-      lastRow: sheet.getLastRow(),
-      lastColumn: sheet.getLastColumn()
+    if (missingSheets.length > 0) {
+      console.warn('Warning: The following sheets are missing: ' + missingSheets.join(', '));
+      console.warn('Please create these sheets with the correct column headers.');
+    } else {
+      console.log('All required sheets exist.');
+    }
+    
+    // Test data retrieval
+    console.log('Testing data retrieval...');
+    var testE = {
+      parameter: {
+        action: 'getData'
+      }
     };
+    
+    var result = getInitialData(testE);
+    console.log('Data retrieval test completed successfully');
+    return 'Test completed successfully. Check logs for details.';
+    
   } catch (error) {
-    return { 
-      success: false, 
-      message: 'Error: ' + error.toString(),
-      stack: error.stack
-    };
+    console.error('Test failed:', error);
+    throw error;
   }
 }
