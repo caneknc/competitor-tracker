@@ -135,6 +135,7 @@
             
             // Add event listeners
             document.getElementById('ourModel').addEventListener('change', updateCompetitorFields);
+            document.getElementById('promoterName').addEventListener('change', updateStoresForPromoter);
             document.getElementById('salesForm').addEventListener('submit', handleFormSubmit);
         });
 
@@ -197,6 +198,38 @@
             document.body.appendChild(script);
         }
 
+        // Function to update stores based on selected promoter
+        function updateStoresForPromoter() {
+            const promoterName = this.value;
+            const storeSelect = document.getElementById('storeName');
+            
+            if (!promoterName) {
+                // Reset stores if no promoter selected
+                storeSelect.innerHTML = '<option value="" selected disabled>Seleccione una tienda</option>';
+                appData.stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store;
+                    option.textContent = store;
+                    storeSelect.appendChild(option);
+                });
+                return;
+            }
+            
+            // Find the selected promoter
+            const promoter = appData.promoters.find(p => p.name === promoterName);
+            
+            if (promoter && promoter.stores) {
+                // Clear and populate with promoter's stores
+                storeSelect.innerHTML = '<option value="" selected disabled>Seleccione una tienda</option>';
+                promoter.stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store;
+                    option.textContent = store;
+                    storeSelect.appendChild(option);
+                });
+            }
+        }
+
         // Initialize dropdowns with data
         function initializeDropdowns() {
             console.log('Initializing dropdowns with data:', appData);
@@ -212,7 +245,7 @@
                 promoterSelect.appendChild(option);
             });
             
-            // Populate store dropdown
+            // Initialize store dropdown with all stores
             const storeSelect = document.getElementById('storeName');
             storeSelect.innerHTML = '<option value="" selected disabled>Seleccione una tienda</option>';
             
@@ -274,16 +307,16 @@
         function handleFormSubmit(e) {
             e.preventDefault();
             
-            const form = e.target;
+            const formElement = e.target;
             
             // Check form validity
-            if (!form.checkValidity()) {
+            if (!formElement.checkValidity()) {
                 e.stopPropagation();
-                form.classList.add('was-validated');
+                formElement.classList.add('was-validated');
                 return;
             }
             
-            const submitButton = form.querySelector('button[type="submit"]');
+            const submitButton = formElement.querySelector('button[type="submit"]');
             const originalButtonText = submitButton.innerHTML;
             
             // Show loading state
@@ -335,8 +368,8 @@
                     successMessage.style.display = 'block';
                     
                     // Reset form
-                    form.reset();
-                    form.classList.remove('was-validated');
+                    formElement.reset();
+                    formElement.classList.remove('was-validated');
                     document.getElementById('competitorModels').innerHTML = '';
                     
                     // Hide success message after 5 seconds
@@ -350,15 +383,32 @@
                 }
             };
             
-            // Create script element for JSONP
-            const script = document.createElement('script');
-            const url = `${SCRIPT_URL}?action=submitData&data=${encodeURIComponent(JSON.stringify(formData))}&callback=${callbackName}`;
-            console.log('Sending request to:', url);
-            script.src = url;
+            // Create a form element for JSONP submission
+            const jsonpForm = document.createElement('form');
+            jsonpForm.method = 'POST';
+            jsonpForm.action = SCRIPT_URL;
             
-            // Set up error handling
-            script.onerror = function() {
-                console.error('Script load error');
+            // Add form data as hidden inputs
+            const addHiddenInput = (form, name, value) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                form.appendChild(input);
+            };
+            
+            addHiddenInput(jsonpForm, 'action', 'submitData');
+            addHiddenInput(jsonpForm, 'data', JSON.stringify(formData));
+            addHiddenInput(jsonpForm, 'callback', callbackName);
+            
+            // Add form to document and submit
+            document.body.appendChild(jsonpForm);
+            jsonpForm.submit();
+            document.body.removeChild(jsonpForm);
+            
+            // Set up error handling for the form submission
+            jsonpForm.onerror = function() {
+                console.error('Form submission error');
                 alert('Error al conectar con el servidor. Por favor, inténtalo de nuevo.');
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalButtonText;
