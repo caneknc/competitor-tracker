@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -242,10 +242,12 @@
                 const option = document.createElement('option');
                 option.value = promoter.name;
                 option.textContent = promoter.name;
+                // Store stores as JSON string to handle multiple stores
+                option.setAttribute('data-stores', JSON.stringify(promoter.stores || []));
                 promoterSelect.appendChild(option);
             });
             
-            // Initialize store dropdown with all stores
+            // Populate store dropdown with all stores initially
             const storeSelect = document.getElementById('storeName');
             storeSelect.innerHTML = '<option value="" selected disabled>Seleccione una tienda</option>';
             
@@ -265,6 +267,39 @@
                 option.value = model;
                 option.textContent = model;
                 modelSelect.appendChild(option);
+            });
+            
+            // Add event listener for promoter selection
+            promoterSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                const storesJson = selectedOption.getAttribute('data-stores');
+                
+                if (storesJson) {
+                    try {
+                        const stores = JSON.parse(storesJson);
+                        const storeSelect = document.getElementById('storeName');
+                        
+                        if (stores.length > 0) {
+                            // Clear existing options
+                            storeSelect.innerHTML = '';
+                            
+                            // Add new options
+                            stores.forEach(store => {
+                                const option = document.createElement('option');
+                                option.value = store;
+                                option.textContent = store;
+                                storeSelect.appendChild(option);
+                            });
+                            
+                            // Select the first store by default
+                            if (storeSelect.options.length > 0) {
+                                storeSelect.selectedIndex = 0;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing stores:', e);
+                    }
+                }
             });
         }
 
@@ -307,16 +342,16 @@
         function handleFormSubmit(e) {
             e.preventDefault();
             
-            const formElement = e.target;
+            const form = e.target;
             
             // Check form validity
-            if (!formElement.checkValidity()) {
+            if (!form.checkValidity()) {
                 e.stopPropagation();
-                formElement.classList.add('was-validated');
+                form.classList.add('was-validated');
                 return;
             }
             
-            const submitButton = formElement.querySelector('button[type="submit"]');
+            const submitButton = form.querySelector('button[type="submit"]');
             const originalButtonText = submitButton.innerHTML;
             
             // Show loading state
@@ -368,8 +403,8 @@
                     successMessage.style.display = 'block';
                     
                     // Reset form
-                    formElement.reset();
-                    formElement.classList.remove('was-validated');
+                    form.reset();
+                    form.classList.remove('was-validated');
                     document.getElementById('competitorModels').innerHTML = '';
                     
                     // Hide success message after 5 seconds
@@ -383,32 +418,15 @@
                 }
             };
             
-            // Create a form element for JSONP submission
-            const jsonpForm = document.createElement('form');
-            jsonpForm.method = 'POST';
-            jsonpForm.action = SCRIPT_URL;
+            // Create script element for JSONP
+            const script = document.createElement('script');
+            const url = `${SCRIPT_URL}?action=submitData&data=${encodeURIComponent(JSON.stringify(formData))}&callback=${callbackName}`;
+            console.log('Sending request to:', url);
+            script.src = url;
             
-            // Add form data as hidden inputs
-            const addHiddenInput = (form, name, value) => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = name;
-                input.value = value;
-                form.appendChild(input);
-            };
-            
-            addHiddenInput(jsonpForm, 'action', 'submitData');
-            addHiddenInput(jsonpForm, 'data', JSON.stringify(formData));
-            addHiddenInput(jsonpForm, 'callback', callbackName);
-            
-            // Add form to document and submit
-            document.body.appendChild(jsonpForm);
-            jsonpForm.submit();
-            document.body.removeChild(jsonpForm);
-            
-            // Set up error handling for the form submission
-            jsonpForm.onerror = function() {
-                console.error('Form submission error');
+            // Set up error handling
+            script.onerror = function() {
+                console.error('Script load error');
                 alert('Error al conectar con el servidor. Por favor, inténtalo de nuevo.');
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalButtonText;
