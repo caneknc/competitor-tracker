@@ -403,8 +403,10 @@
             e.preventDefault();
             
             console.log('1. Form submission started');
+            console.log('1.1 Event:', e);
             
             const form = e.target;
+            console.log('1.2 Form element:', form);
             
             // Check form validity
             if (!form.checkValidity()) {
@@ -426,6 +428,10 @@
             };
             
             console.log('4. Basic form data:', formData);
+            console.log('4.1 Form values - promoter:', form.promoterName.value);
+            console.log('4.2 Form values - store:', form.storeName.value);
+            console.log('4.3 Form values - date:', form.saleDate.value);
+            console.log('4.4 Form values - model:', form.ourModel.value);
             
             // Get all competitor models and their values
             const competitorRows = document.querySelectorAll('.competitor-row');
@@ -496,9 +502,21 @@
             
             // Create script element for JSONP
             const script = document.createElement('script');
-            const url = `${SCRIPT_URL}?action=submitData&data=${encodeURIComponent(JSON.stringify(formData))}&callback=${callbackName}`;
-            console.log('11. Sending form data to:', url);
-            script.src = url;
+            const jsonData = JSON.stringify(formData);
+            console.log('10.1 Stringified form data:', jsonData);
+            
+            try {
+                const url = `${SCRIPT_URL}?action=submitData&data=${encodeURIComponent(jsonData)}&callback=${callbackName}`;
+                console.log('11. Sending form data to:', url);
+                script.src = url;
+                console.log('11.1 Script source set');
+            } catch (error) {
+                console.error('11.2 Error creating URL:', error);
+                alert('Error al preparar los datos. Por favor, inténtalo de nuevo.');
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+                return;
+            }
             
             // Set up error handling
             script.onerror = function() {
@@ -516,8 +534,28 @@
             
             // Add script to the page to make the request
             console.log('13. Appending form submission script to body');
-            document.body.appendChild(script);
-            console.log('14. Form submission script appended, request should be in progress');
+            try {
+                document.body.appendChild(script);
+                console.log('13.1 Script appended to body');
+                console.log('14. Form submission script appended, request should be in progress');
+                
+                // Log the current state of the script element
+                console.log('14.1 Script element state:', {
+                    src: script.src,
+                    async: script.async,
+                    parentNode: script.parentNode,
+                    readyState: script.readyState
+                });
+            } catch (error) {
+                console.error('13.2 Error appending script:', error);
+                alert('Error al enviar los datos. Por favor, inténtalo de nuevo.');
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+                
+                // Clean up
+                delete window[callbackName];
+                return;
+            }
             
             // Set a timeout to clean up if the request takes too long
             const timeout = setTimeout(() => {
