@@ -146,56 +146,61 @@
             
             // Create a unique callback function name
             const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-            const url = `${SCRIPT_URL}?action=getData&callback=${callbackName}`;
-            console.log('3. Generated URL with callback:', url);
-            
-            // Create script element
-            const script = document.createElement('script');
-            script.src = url;
-            console.log('4. Script element created');
+            const url = `${SCRIPT_URL}?action=getData`;
+            console.log('3. Generated URL:', url);
             
             // Set up the callback function
             window[callbackName] = function(result) {
-                console.log('5. Received server response');
-                console.log('6. Raw response:', result);
+                console.log('4. Callback received data:', result);
                 
-                try {
-                    if (result && result.status === 'success') {
-                        appData = result.data || { promoters: [], stores: [], modelCompetitors: {} };
-                        console.log('7. Data loaded successfully');
-                        console.log('8. Promoters:', appData.promoters);
-                        console.log('9. Stores:', appData.stores);
-                        console.log('10. Models:', Object.keys(appData.modelCompetitors || {}));
-                        initializeDropdowns();
-                    } else {
-                        const errorMsg = result && result.message || 'Error en la respuesta del servidor';
-                        console.error('7. Error in response:', errorMsg);
-                        throw new Error(errorMsg);
-                    }
-                } catch (error) {
-                    console.error('Error processing data:', error);
-                    alert('Error al cargar los datos: ' + error.message);
-                }
+                // Store the data
+                appData = result;
+                console.log('5. Data stored in appData:', appData);
+                
+                // Initialize the UI
+                initializeDropdowns();
                 
                 // Clean up
                 delete window[callbackName];
-                if (script.parentNode) {
-                    document.body.removeChild(script);
-                }
             };
             
-            // Handle script loading errors
-            script.onerror = function() {
-                console.error('Error loading script');
-                alert('Error al cargar los datos. Por favor, inténtalo de nuevo.');
-                delete window[callbackName];
-                if (script.parentNode) {
-                    document.body.removeChild(script);
-                }
+            // Use fetch with CORS mode
+            const options = {
+                method: 'GET',
+                mode: 'no-cors'
             };
             
-            // Add script to the page to make the request
-            document.body.appendChild(script);
+            console.log('6. Making fetch request');
+            fetch(`${url}&callback=${callbackName}`, options)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    try {
+                        // Try to parse JSON response
+                        const result = JSON.parse(text);
+                        window[callbackName](result);
+                    } catch (e) {
+                        // If not JSON, try to execute as JSONP
+                        try {
+                            // This will execute the JSONP response
+                            const script = document.createElement('script');
+                            script.text = text;
+                            document.body.appendChild(script).remove();
+                        } catch (e) {
+                            console.error('Error processing response:', e);
+                            alert('Error al procesar la respuesta del servidor');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    alert('Error al cargar los datos. Por favor, recarga la página.');
+                    delete window[callbackName];
+                });
         }
 
         // Function to update stores based on selected promoter
@@ -418,44 +423,54 @@
                 }
             };
             
-            // Create script element for JSONP
-            const script = document.createElement('script');
-            const url = `${SCRIPT_URL}?action=submitData&data=${encodeURIComponent(JSON.stringify(formData))}&callback=${callbackName}`;
-            console.log('Sending request to:', url);
-            script.src = url;
-            
-            // Set up error handling
-            script.onerror = function() {
-                console.error('Script load error');
-                alert('Error al conectar con el servidor. Por favor, inténtalo de nuevo.');
-                submitButton.disabled = false;
-                submitButton.innerHTML = originalButtonText;
-                delete window[callbackName];
+            // Use fetch with CORS mode
+            const url = `${SCRIPT_URL}?action=submitData`;
+            const options = {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ...formData,
+                    callback: callbackName
+                })
             };
+
+            console.log('Sending request to:', url, 'with options:', options);
             
-            // Set a timeout to clean up if the request takes too long
-            const timeout = setTimeout(() => {
-                if (window[callbackName]) {
-                    console.error('Request timed out');
-                    alert('La solicitud está tardando demasiado. Por favor, verifica tu conexión e inténtalo de nuevo.');
+            fetch(url, options)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    try {
+                        // Try to parse JSON response
+                        const result = JSON.parse(text);
+                        window[callbackName](result);
+                    } catch (e) {
+                        // If not JSON, try to execute as JSONP
+                        try {
+                            // This will execute the JSONP response
+                            const script = document.createElement('script');
+                            script.text = text;
+                            document.body.appendChild(script).remove();
+                        } catch (e) {
+                            console.error('Error processing response:', e);
+                            throw new Error('Error processing server response');
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    alert('Error al conectar con el servidor. Por favor, inténtalo de nuevo.');
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonText;
                     delete window[callbackName];
-                    if (document.body.contains(script)) {
-                        document.body.removeChild(script);
-                    }
-                }
-            }, 30000); // 30 second timeout
-            
-            // Override the callback to clear the timeout
-            const originalCallback = window[callbackName];
-            window[callbackName] = function() {
-                clearTimeout(timeout);
-                originalCallback.apply(this, arguments);
-            };
-            
-            // Add script to the page to make the request
-            document.body.appendChild(script);
+                });
         }
     </script>
 </body>
