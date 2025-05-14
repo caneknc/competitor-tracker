@@ -296,16 +296,24 @@
                     return;
                 }
                 
+                console.log('23. Model competitors data:', appData.modelCompetitors);
                 const modelKeys = Object.keys(appData.modelCompetitors || {});
-                console.log('23. Populating model dropdown with', modelKeys.length, 'models');
+                console.log('24. Populating model dropdown with', modelKeys.length, 'models');
                 modelSelect.innerHTML = '<option value="" selected disabled>Seleccione un modelo</option>';
                 
                 modelKeys.forEach((model, index) => {
-                    const option = document.createElement('option');
-                    option.value = model;
-                    option.textContent = model;
-                    modelSelect.appendChild(option);
-                    console.log(`24. Added model ${index + 1}:`, model);
+                    console.log(`25. Processing model ${index + 1}:`, model);
+                    console.log(`26. Model value:`, model, 'Type:', typeof model);
+                    
+                    try {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        modelSelect.appendChild(option);
+                        console.log(`27. Successfully added model ${index + 1}:`, model);
+                    } catch (error) {
+                        console.error('28. Error adding model to dropdown:', error);
+                    }
                 });
                 
                 // Add event listener for promoter selection
