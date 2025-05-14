@@ -153,12 +153,25 @@
             window[callbackName] = function(result) {
                 console.log('4. Callback received data:', result);
                 
-                // Store the data
-                appData = result;
-                console.log('5. Data stored in appData:', appData);
-                
-                // Initialize the UI
-                initializeDropdowns();
+                // Check if we have valid data
+                if (result && result.status === 'success' && result.data) {
+                    console.log('5. Successfully received data');
+                    
+                    // Store the data
+                    appData.promoters = result.data.promoters || [];
+                    appData.stores = result.data.stores || [];
+                    appData.modelCompetitors = result.data.modelCompetitors || {};
+                    
+                    console.log('6. Promoters loaded:', appData.promoters.length);
+                    console.log('7. Stores loaded:', appData.stores.length);
+                    console.log('8. Models loaded:', Object.keys(appData.modelCompetitors).length);
+                    
+                    // Initialize the UI
+                    initializeDropdowns();
+                } else {
+                    console.error('9. Invalid data received:', result);
+                    alert('Error: Datos inválidos recibidos del servidor');
+                }
                 
                 // Clean up
                 delete window[callbackName];
@@ -167,11 +180,11 @@
             // Create script element for JSONP
             const script = document.createElement('script');
             script.src = `${url}&callback=${callbackName}`;
-            console.log('6. Making JSONP request');
+            console.log('10. Making JSONP request to:', script.src);
             
             // Set up error handling
             script.onerror = function() {
-                console.error('Script load error');
+                console.error('11. Script load error');
                 alert('Error al cargar los datos. Por favor, recarga la página.');
                 delete window[callbackName];
             };
@@ -179,7 +192,7 @@
             // Set a timeout to clean up if the request takes too long
             const timeout = setTimeout(() => {
                 if (window[callbackName]) {
-                    console.error('Request timed out');
+                    console.error('12. Request timed out');
                     alert('La solicitud está tardando demasiado. Por favor, recarga la página.');
                     delete window[callbackName];
                     if (document.body.contains(script)) {
@@ -196,7 +209,9 @@
             };
             
             // Add script to the page to make the request
+            console.log('13. Appending script to body');
             document.body.appendChild(script);
+            console.log('14. Script appended, request should be in progress');
         }
 
         // Function to update stores based on selected promoter
@@ -233,75 +248,111 @@
 
         // Initialize dropdowns with data
         function initializeDropdowns() {
-            console.log('Initializing dropdowns with data:', appData);
+            console.log('15. Starting to initialize dropdowns');
             
-            // Populate promoter dropdown
-            const promoterSelect = document.getElementById('promoterName');
-            promoterSelect.innerHTML = '<option value="" selected disabled>Seleccione un promotor</option>';
-            
-            appData.promoters.forEach(promoter => {
-                const option = document.createElement('option');
-                option.value = promoter.name;
-                option.textContent = promoter.name;
-                // Store stores as JSON string to handle multiple stores
-                option.setAttribute('data-stores', JSON.stringify(promoter.stores || []));
-                promoterSelect.appendChild(option);
-            });
-            
-            // Populate store dropdown with all stores initially
-            const storeSelect = document.getElementById('storeName');
-            storeSelect.innerHTML = '<option value="" selected disabled>Seleccione una tienda</option>';
-            
-            appData.stores.forEach(store => {
-                const option = document.createElement('option');
-                option.value = store;
-                option.textContent = store;
-                storeSelect.appendChild(option);
-            });
-            
-            // Populate model dropdown
-            const modelSelect = document.getElementById('ourModel');
-            modelSelect.innerHTML = '<option value="" selected disabled>Seleccione un modelo</option>';
-            
-            Object.keys(appData.modelCompetitors || {}).forEach(model => {
-                const option = document.createElement('option');
-                option.value = model;
-                option.textContent = model;
-                modelSelect.appendChild(option);
-            });
-            
-            // Add event listener for promoter selection
-            promoterSelect.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const storesJson = selectedOption.getAttribute('data-stores');
-                
-                if (storesJson) {
-                    try {
-                        const stores = JSON.parse(storesJson);
-                        const storeSelect = document.getElementById('storeName');
-                        
-                        if (stores.length > 0) {
-                            // Clear existing options
-                            storeSelect.innerHTML = '';
-                            
-                            // Add new options
-                            stores.forEach(store => {
-                                const option = document.createElement('option');
-                                option.value = store;
-                                option.textContent = store;
-                                storeSelect.appendChild(option);
-                            });
-                            
-                            // Select the first store by default
-                            if (storeSelect.options.length > 0) {
-                                storeSelect.selectedIndex = 0;
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Error parsing stores:', e);
-                    }
+            try {
+                // Populate promoter dropdown
+                const promoterSelect = document.getElementById('promoterName');
+                if (!promoterSelect) {
+                    console.error('16. Could not find promoter select element');
+                    return;
                 }
-            });
+                
+                console.log('17. Populating promoter dropdown with', appData.promoters.length, 'promoters');
+                promoterSelect.innerHTML = '<option value="" selected disabled>Seleccione un promotor</option>';
+                
+                appData.promoters.forEach((promoter, index) => {
+                    const option = document.createElement('option');
+                    option.value = promoter.name;
+                    option.textContent = promoter.name;
+                    // Store stores as JSON string to handle multiple stores
+                    option.setAttribute('data-stores', JSON.stringify(promoter.stores || []));
+                    promoterSelect.appendChild(option);
+                    console.log(`18. Added promoter ${index + 1}:`, promoter.name);
+                });
+                
+                // Populate store dropdown with all stores initially
+                const storeSelect = document.getElementById('storeName');
+                if (!storeSelect) {
+                    console.error('19. Could not find store select element');
+                    return;
+                }
+                
+                console.log('20. Populating store dropdown with', appData.stores.length, 'stores');
+                storeSelect.innerHTML = '<option value="" selected disabled>Seleccione una tienda</option>';
+                
+                appData.stores.forEach((store, index) => {
+                    const option = document.createElement('option');
+                    option.value = store;
+                    option.textContent = store;
+                    storeSelect.appendChild(option);
+                    console.log(`21. Added store ${index + 1}:`, store);
+                });
+                
+                // Populate model dropdown
+                const modelSelect = document.getElementById('ourModel');
+                if (!modelSelect) {
+                    console.error('22. Could not find model select element');
+                    return;
+                }
+                
+                const modelKeys = Object.keys(appData.modelCompetitors || {});
+                console.log('23. Populating model dropdown with', modelKeys.length, 'models');
+                modelSelect.innerHTML = '<option value="" selected disabled>Seleccione un modelo</option>';
+                
+                modelKeys.forEach((model, index) => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                    console.log(`24. Added model ${index + 1}:`, model);
+                });
+                
+                // Add event listener for promoter selection
+                console.log('25. Adding event listener for promoter selection');
+                promoterSelect.addEventListener('change', function() {
+                    console.log('26. Promoter selection changed');
+                    const selectedOption = this.options[this.selectedIndex];
+                    const storesJson = selectedOption.getAttribute('data-stores');
+                    
+                    if (storesJson) {
+                        try {
+                            console.log('27. Processing stores for selected promoter');
+                            const stores = JSON.parse(storesJson);
+                            const storeSelect = document.getElementById('storeName');
+                            
+                            if (stores.length > 0) {
+                                console.log('28. Found', stores.length, 'stores for selected promoter');
+                                // Clear existing options
+                                storeSelect.innerHTML = '';
+                                
+                                // Add new options
+                                stores.forEach((store, index) => {
+                                    const option = document.createElement('option');
+                                    option.value = store;
+                                    option.textContent = store;
+                                    storeSelect.appendChild(option);
+                                    console.log(`29. Added store option ${index + 1}:`, store);
+                                });
+                                
+                                storeSelect.disabled = false;
+                            } else {
+                                console.log('30. No stores found for selected promoter');
+                                storeSelect.innerHTML = '<option value="" selected disabled>No hay tiendas disponibles</option>';
+                                storeSelect.disabled = true;
+                            }
+                        } catch (e) {
+                            console.error('31. Error parsing stores:', e);
+                        }
+                    } else {
+                        console.log('32. No stores data found for selected promoter');
+                    }
+                });
+                
+                console.log('33. Finished initializing dropdowns');
+            } catch (error) {
+                console.error('34. Error in initializeDropdowns:', error);
+            }
         }
 
         // Update competitor fields based on selected model
