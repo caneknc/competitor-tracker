@@ -1,10 +1,3 @@
-// Model to competitor mapping
-const modelCompetitors = {
-    'Model A': ['Competitor 1A', 'Competitor 2A', 'Competitor 3A'],
-    'Model B': ['Competitor 1B', 'Competitor 2B', 'Competitor 3B'],
-    'Model C': ['Competitor 1C', 'Competitor 2C', 'Competitor 3C']
-};
-
 // App configuration
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDkFnwJaAR0SDdfrcPzSoC5hUjAwdP2GXstrjddUj0sgWE2_nfwTsw5meKPyJsc3a3/exec';
 
@@ -118,9 +111,6 @@ function initializeDropdowns() {
         option.textContent = model;
         modelSelect.appendChild(option);
     });
-    
-    // Set up form submission
-    // Form submission is now handled inline in the event listener below
 }
 
 // Update competitor fields based on selected model
