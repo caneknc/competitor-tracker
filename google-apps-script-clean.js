@@ -20,19 +20,26 @@ function setCorsHeaders() {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '3600'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Max-Age': '3600',
+    'Vary': 'Origin, Access-Control-Request-Headers, Access-Control-Request-Method'
   };
 }
 
 // Handle OPTIONS request for CORS preflight
 function doOptions() {
-  const response = HtmlService.createHtmlOutput('');
+  const response = ContentService.createTextOutput('');
   const headers = setCorsHeaders();
   
+  // Set all CORS headers
   Object.keys(headers).forEach(function(key) {
     response.setHeader(key, headers[key]);
   });
+  
+  // Set status code for preflight response
+  response.setMimeType(ContentService.MimeType.JSON);
+  response.setStatusCode(204); // No Content
   
   return response;
 }
@@ -41,7 +48,16 @@ function doOptions() {
 function doPost(e) {
   try {
     // Handle CORS preflight
-    if (e && e.parameter && e.parameter.action === 'options') {
+    if (!e) {
+      e = { parameter: {} };
+    }
+    
+    if (!e.parameter) {
+      e.parameter = {};
+    }
+    
+    // Check for preflight request
+    if (e.httpMethod === 'OPTIONS' || (e.parameter && e.parameter.action === 'options')) {
       return doOptions();
     }
     
@@ -51,11 +67,12 @@ function doPost(e) {
         const jsonData = JSON.parse(e.postData.contents);
         // If the parsed data has parameters, merge them with the existing parameters
         if (jsonData) {
-          e.parameter = e.parameter || {};
-          // Merge the parsed JSON data with the existing parameters
-          Object.keys(jsonData).forEach(key => {
-            e.parameter[key] = jsonData[key];
-          });
+          // If the data is wrapped in a 'data' property, use that
+          if (jsonData.data) {
+            e.parameter = { ...e.parameter, ...jsonData.data };
+          } else {
+            e.parameter = { ...e.parameter, ...jsonData };
+          }
         }
       } catch (error) {
         console.error('Error parsing JSON data:', error);
@@ -72,17 +89,25 @@ function doPost(e) {
 // This function runs when the web app receives a GET request
 function doGet(e) {
   try {
+    if (!e) {
+      e = { parameter: {} };
+    }
+    
+    if (!e.parameter) {
+      e.parameter = {};
+    }
+    
     // Handle CORS preflight
-    if (e && e.parameter && e.parameter.action === 'options') {
+    if (e.parameter.action === 'options' || (e.queryString && e.queryString.includes('action=options'))) {
       return doOptions();
     }
     
     // Check if this is a data request
-    if (e.parameter && e.parameter.action === 'getData') {
+    if (e.parameter.action === 'getData') {
       return getInitialData(e);
     }
     
-    // For other GET requests, return a simple HTML page
+    // For other GET requests, return a simple HTML page with CORS headers
     const html = HtmlService.createHtmlOutput('<h1>Competitor Sales Tracker</h1><p>API is running.</p>')
       .setTitle('Competitor Sales Tracker')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -99,20 +124,30 @@ function doGet(e) {
   }
 }
 
-// Handle errors and return proper response
+// Handle errors and return proper response with CORS headers
 function handleError(error) {
   console.error('Error:', error);
-  const response = ContentService.createTextOutput(JSON.stringify({
+  
+  const errorData = {
     status: 'error',
     message: error.message || 'An unknown error occurred',
-    stack: error.stack
-  }));
+    // Only include stack trace in development
+    ...(error.stack && { stack: error.stack })
+  };
   
+  // Create response with CORS headers
+  const response = ContentService.createTextOutput(JSON.stringify(errorData));
   response.setMimeType(ContentService.MimeType.JSON);
+  
+  // Set CORS headers
   const headers = setCorsHeaders();
   Object.keys(headers).forEach(function(key) {
     response.setHeader(key, headers[key]);
   });
+  
+  // Set appropriate status code
+  const statusCode = error.statusCode || 500;
+  response.setStatusCode(statusCode);
   
   return response;
 }
@@ -126,12 +161,15 @@ function createResponse(data, statusCode) {
   // Set CORS headers
   const headers = setCorsHeaders();
   Object.keys(headers).forEach(function(key) {
+    // Don't override the Content-Type header if it's already set
+    if (key === 'Content-Type' && response.getHeaders()['Content-Type']) {
+      return;
+    }
     response.setHeader(key, headers[key]);
   });
   
-  if (statusCode !== 200) {
-    response.setStatusCode(statusCode);
-  }
+  // Set status code
+  response.setStatusCode(statusCode);
   
   return response;
 }
@@ -152,7 +190,8 @@ function createJsonpResponse(data, callback) {
 
 // Get initial data for the form
 function getInitialData(e) {
-  const callback = e.parameter.callback;
+  const params = e.parameter || {};
+  const callback = params.callback;
   const isJsonp = !!callback;
   
   try {
@@ -160,7 +199,9 @@ function getInitialData(e) {
     
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     if (!ss) {
-      throw new Error('Could not open spreadsheet with ID: ' + SPREADSHEET_ID);
+      const error = new Error('Could not open spreadsheet with ID: ' + SPREADSHEET_ID);
+      error.statusCode = 500;
+      throw error;
     }
     
     // Get promoters and their stores
@@ -171,11 +212,11 @@ function getInitialData(e) {
     const promoterMap = {}; // To group stores by promoter
     
     // Skip header row
-    for (var i = 1; i < promotersData.length; i++) {
-      var row = promotersData[i];
+    for (let i = 1; i < promotersData.length; i++) {
+      const row = promotersData[i];
       if (row && row[PROMOTER_COL]) {
-        var promoterName = row[PROMOTER_COL].toString().trim();
-        var storeName = row[STORE_COL] ? row[STORE_COL].toString().trim() : '';
+        const promoterName = row[PROMOTER_COL].toString().trim();
+        const storeName = row[STORE_COL] ? row[STORE_COL].toString().trim() : '';
         
         if (!promoterMap[promoterName]) {
           promoterMap[promoterName] = [];
@@ -188,7 +229,7 @@ function getInitialData(e) {
     }
     
     // Convert map to array of promoter objects
-    for (var name in promoterMap) {
+    for (const name in promoterMap) {
       if (promoterMap.hasOwnProperty(name)) {
         promoters.push({
           name: name,
@@ -205,9 +246,9 @@ function getInitialData(e) {
     
     // Skip header row and add unique stores
     const storeSet = {};
-    for (var j = 1; j < storesData.length; j++) {
+    for (let j = 1; j < storesData.length; j++) {
       if (storesData[j] && storesData[j][0]) {
-        var storeName = storesData[j][0].toString().trim();
+        const storeName = storesData[j][0].toString().trim();
         if (storeName && !storeSet[storeName]) {
           storeSet[storeName] = true;
           stores.push(storeName);
@@ -221,11 +262,13 @@ function getInitialData(e) {
     const modelsData = modelsSheet ? modelsSheet.getDataRange().getValues() : [];
     const modelCompetitors = {};
     
+    // Process models and their competitors
     // Skip header row
-    for (var k = 1; k < modelsData.length; k++) {
-      if (modelsData[k]) {
-        var model = modelsData[k][MODEL_COL] ? modelsData[k][MODEL_COL].toString().trim() : '';
-        var competitor = modelsData[k][COMPETITOR_COL] ? modelsData[k][COMPETITOR_COL].toString().trim() : '';
+    for (let k = 1; k < modelsData.length; k++) {
+      const row = modelsData[k];
+      if (row && row[MODEL_COL]) {
+        const model = row[MODEL_COL].toString().trim();
+        const competitor = row[COMPETITOR_COL] ? row[COMPETITOR_COL].toString().trim() : '';
         
         if (model) {
           if (!modelCompetitors[model]) {
@@ -257,15 +300,14 @@ function getInitialData(e) {
       
   } catch (error) {
     console.error('Error in getInitialData:', error);
-    const errorResponse = {
-      status: 'error',
-      message: 'Failed to load initial data',
-      details: error.message || error.toString()
-    };
     
-    return isJsonp 
-      ? createJsonpResponse(errorResponse, callback)
-      : createResponse(errorResponse, 500);
+    // Create a proper error object with status code
+    const errorObj = new Error(error.message || 'Failed to load initial data');
+    errorObj.statusCode = error.statusCode || 500;
+    errorObj.details = error.details || error.toString();
+    
+    // Use handleError to ensure proper CORS headers
+    return handleError(errorObj);
   }
 }
 
