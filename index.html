@@ -116,7 +116,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Global variables
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOf03vWMJHyJVEn8Al41vJzUtSOYTcY2AfjfkJ0KvjbQz3BpQs0F_JJu0pjDbEM7SM/exec';
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwJgdoNdAOEcLY6vDkWF6FAzCTZnl6EnH8Iev8DFbxL6f1-aV9lBCgaY3kwzBmaTezL/exec';
         let appData = {
             promoters: [],
             stores: [],
@@ -500,43 +500,67 @@
                 delete window[callbackName];
             };
             
-            // Use fetch to submit the form data with CORS
+            // Use JSONP for form submission to avoid CORS issues
             console.log('10.1 Stringified form data:', formData);
             
-            fetch(SCRIPT_URL, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `action=submitData&data=${encodeURIComponent(JSON.stringify(formData))}`
-            })
-            .then(response => {
-                console.log('11.1 Response status:', response.status);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('11.2 Response data:', data);
-                window[callbackName](data);
-            })
-            .catch(error => {
-                console.error('11.3 Error submitting form:', error);
-                // Fallback to JSONP if fetch fails
-                console.log('11.4 Falling back to JSONP');
-                const script = document.createElement('script');
-                script.src = `${SCRIPT_URL}?action=submitData&data=${encodeURIComponent(JSON.stringify(formData))}&callback=${callbackName}`;
-                script.onerror = function() {
-                    console.error('11.5 JSONP fallback failed');
-                    alert('Error al conectar con el servidor. Por favor, inténtalo de nuevo.');
+            // Create a unique callback name for JSONP
+            const jsonpCallback = 'jsonp_callback_' + Math.round(Math.random() * 1000000);
+            
+            // Define the callback function
+            window[jsonpCallback] = function(response) {
+                console.log('11.1 JSONP response received:', response);
+                // Clean up by removing the script element and the global callback
+                document.body.removeChild(script);
+                delete window[jsonpCallback];
+                
+                // Process the response
+                if (response && response.status === 'success') {
+                    console.log('11.2 Form submitted successfully');
+                    window[callbackName](response);
+                } else {
+                    const errorMsg = (response && response.message) || 'Error desconocido del servidor';
+                    console.error('11.3 Server error:', errorMsg);
+                    alert('Error: ' + errorMsg);
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalButtonText;
-                    delete window[callbackName];
-                };
-                document.body.appendChild(script);
-            });
+                }
+            };
+            
+            // Create the script element
+            const script = document.createElement('script');
+            const url = new URL(SCRIPT_URL);
+            url.searchParams.append('action', 'submitData');
+            url.searchParams.append('data', JSON.stringify(formData));
+            url.searchParams.append('callback', jsonpCallback);
+            
+            script.src = url.toString();
+            
+            // Set up error handling
+            script.onerror = function() {
+                console.error('11.4 JSONP request failed');
+                alert('No se pudo conectar con el servidor. Por favor, verifica tu conexión e inténtalo de nuevo.');
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
+                // Clean up
+                if (window[jsonpCallback]) {
+                    delete window[jsonpCallback];
+                }
+                if (script.parentNode) {
+                    document.body.removeChild(script);
+                }
+            };
+            
+            // Set a timeout to clean up if the request takes too long
+            const timeoutId = setTimeout(function() {
+                if (window[jsonpCallback]) {
+                    console.error('11.5 JSONP request timed out');
+                    script.onerror();
+                }
+            }, 30000); // 30 second timeout
+            
+            // Add the script to the page to make the request
+            console.log('11.6 Making JSONP request to:', url.toString());
+            document.body.appendChild(script);
             
             // Set a timeout to clean up if the request takes too long
             const timeout = setTimeout(() => {
