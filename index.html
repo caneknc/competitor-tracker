@@ -108,11 +108,8 @@
             </div>
         </form>
 
-        <div id="successMessage" class="alert alert-success mt-3" role="alert" style="display: none; position: fixed; top: 20px; right: 20px; z-index: 1000; min-width: 300px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-            <div class="d-flex justify-content-between align-items-center">
-                <span>¡Datos guardados exitosamente!</span>
-                <button type="button" class="btn-close" onclick="this.parentElement.parentElement.style.display='none'"></button>
-            </div>
+        <div id="successMessage" class="alert alert-success mt-3" role="alert" style="display: none;">
+            ¡Datos enviados correctamente!
         </div>
     </div>
 
@@ -209,21 +206,19 @@
             if (!promoterName) {
                 // Reset stores if no promoter selected
                 storeSelect.innerHTML = '<option value="" selected disabled>Seleccione una tienda</option>';
-                if (appData.stores && appData.stores.length > 0) {
-                    appData.stores.forEach(store => {
-                        const option = document.createElement('option');
-                        option.value = store;
-                        option.textContent = store;
-                        storeSelect.appendChild(option);
-                    });
-                }
+                appData.stores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store;
+                    option.textContent = store;
+                    storeSelect.appendChild(option);
+                });
                 return;
             }
             
             // Find the selected promoter
             const promoter = appData.promoters.find(p => p.name === promoterName);
             
-            if (promoter && Array.isArray(promoter.stores) && promoter.stores.length > 0) {
+            if (promoter && promoter.stores) {
                 // Clear and populate with promoter's stores
                 storeSelect.innerHTML = '<option value="" selected disabled>Seleccione una tienda</option>';
                 promoter.stores.forEach(store => {
@@ -232,14 +227,6 @@
                     option.textContent = store;
                     storeSelect.appendChild(option);
                 });
-                
-                // Select the first store by default if there's only one
-                if (promoter.stores.length === 1) {
-                    storeSelect.selectedIndex = 1; // 0 is the placeholder, 1 is the first store
-                }
-            } else {
-                // If no stores found for promoter, show all stores
-                storeSelect.innerHTML = '<option value="" selected disabled>No hay tiendas asignadas</option>';
             }
         }
 
@@ -420,16 +407,10 @@
                     form.classList.remove('was-validated');
                     document.getElementById('competitorModels').innerHTML = '';
                     
-                    // Set today's date again after reset
-                    const today = new Date();
-                    const formattedDate = today.toISOString().split('T')[0];
-                    document.getElementById('saleDate').value = formattedDate;
-                    
                     // Hide success message after 5 seconds
-                    const hideMessage = () => {
+                    setTimeout(() => {
                         successMessage.style.display = 'none';
-                    };
-                    setTimeout(hideMessage, 5000);
+                    }, 5000);
                 } else {
                     const errorMsg = result && result.message || 'Error al enviar los datos';
                     console.error('Error in form submission:', errorMsg);
