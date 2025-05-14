@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Competitor Sales Tracker
 
 A simple web application for tracking competitor sales and stock information.
@@ -62,3 +63,6 @@ You can customize the models and competitors by editing the `modelCompetitors` o
 ## License
 
 This project is open source and available under the MIT License.
+=======
+# competitor-tracker
+>>>>>>> 6a0f13e688b99a211ef64966585631e84e9d4e26
